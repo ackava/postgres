@@ -53,6 +53,14 @@ docker_create_db_directories() {
 		chmod 700 "$POSTGRES_INITDB_WALDIR"
 	fi
 
+	if [ -n "${POSTGRES_ARCHIVE_DIR:-}" ]; then
+		mkdir -p "$POSTGRES_ARCHIVE_DIR"
+		if [ "$user" = '0' ]; then
+			find "$POSTGRES_ARCHIVE_DIR" \! -user postgres -exec chown postgres '{}' +
+		fi
+		chmod 700 "$POSTGRES_ARCHIVE_DIR"
+	fi
+
 	# allow the container to be started with `--user`
 	if [ "$user" = '0' ]; then
 		find "$PGDATA" \! -user postgres -exec chown postgres '{}' +
@@ -95,6 +103,12 @@ docker_init_database_dir() {
 	if [[ "${LD_PRELOAD:-}" == */libnss_wrapper.so ]]; then
 		rm -f "$NSS_WRAPPER_PASSWD" "$NSS_WRAPPER_GROUP"
 		unset LD_PRELOAD NSS_WRAPPER_PASSWD NSS_WRAPPER_GROUP
+	fi
+
+	# setup archive_mode and archive_command
+	if [ -n "${POSTGRES_ARCHIVE_DIR:-}" ]; then
+		psql "ALTER SYSTEM SET archive_mode to 'ON';"
+		psql "ALTER SYSTEM SET archive_command to 'cp %p $POSTGRES_ARCHIVE_DIR/%f';"
 	fi
 }
 
